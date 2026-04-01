@@ -8,6 +8,8 @@ import Bots from './pages/Bots';
 import BotConfig from './pages/BotConfig';
 import Planos from './pages/Planos';
 import Clientes from './pages/Clientes';
+import Conversations from './pages/Conversations';
+import Configuracoes from './pages/Configuracoes';
 
 const PrivateRoute = ({ children }) => {
   const { token } = useAuth();
@@ -30,8 +32,10 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="bots" element={<Bots />} />
           <Route path="bots/:id" element={<BotConfig />} />
+          <Route path="bots/:botId/conversations" element={<Conversations />} />
           <Route path="clientes" element={<Clientes />} />
           <Route path="planos" element={<Planos />} />
+          <Route path="configuracoes" element={<Configuracoes />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

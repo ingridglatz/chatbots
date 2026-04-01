@@ -1,22 +1,39 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Settings, Code, Eye, Loader, ArrowLeft, Save } from 'lucide-react';
-import { botService } from '../services/api';
-import toast from 'react-hot-toast';
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  Settings,
+  Code,
+  Eye,
+  Loader,
+  ArrowLeft,
+  Save,
+  MessageCircle,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+} from "lucide-react";
+import { botService, whatsappService } from "../services/api";
+import toast from "react-hot-toast";
 
 export default function BotConfig() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('settings');
+  const [activeTab, setActiveTab] = useState("settings");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [bot, setBot] = useState(null);
   const [form, setForm] = useState({
-    name: '',
-    systemPrompt: '',
-    welcomeMessage: '',
-    tone: 'friendly',
+    name: "",
+    systemPrompt: "",
+    welcomeMessage: "",
+    tone: "friendly",
   });
+
+  const [waStatus, setWaStatus] = useState("not_initialized");
+  const [waConnected, setWaConnected] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [waLoading, setWaLoading] = useState(false);
+  const qrPollRef = useRef(null);
 
   useEffect(() => {
     const fetchBot = async () => {
@@ -26,13 +43,13 @@ export default function BotConfig() {
         setBot(botData);
         setForm({
           name: botData.name,
-          systemPrompt: botData.system_prompt || '',
-          welcomeMessage: botData.welcome_message || '',
-          tone: botData.tone || 'friendly',
+          systemPrompt: botData.system_prompt || "",
+          welcomeMessage: botData.welcome_message || "",
+          tone: botData.tone || "friendly",
         });
       } catch (err) {
-        toast.error('Erro ao carregar bot');
-        navigate('/bots');
+        toast.error("Erro ao carregar bot");
+        navigate("/bots");
       } finally {
         setLoading(false);
       }
@@ -50,11 +67,84 @@ export default function BotConfig() {
         welcomeMessage: form.welcomeMessage,
         tone: form.tone,
       });
-      toast.success('Bot atualizado com sucesso!');
+      toast.success("Bot atualizado com sucesso!");
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Erro ao atualizar bot');
+      toast.error(err.response?.data?.message || "Erro ao atualizar bot");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const startWaPolling = () => {
+    if (qrPollRef.current) return;
+    qrPollRef.current = setInterval(async () => {
+      try {
+        const res = await whatsappService.getQR(id);
+        const { connected, qrImage, status } = res.data.data;
+        setWaConnected(connected);
+        setWaStatus(status || (connected ? "connected" : "not_initialized"));
+        if (connected) {
+          setQrDataUrl(null);
+          stopWaPolling();
+        } else if (qrImage) {
+          setQrDataUrl(qrImage);
+        }
+      } catch {}
+    }, 4000);
+  };
+
+  const stopWaPolling = () => {
+    if (qrPollRef.current) {
+      clearInterval(qrPollRef.current);
+      qrPollRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "whatsapp") {
+      whatsappService
+        .getStatus(id)
+        .then((res) => {
+          const { connected, status } = res.data.data;
+          setWaConnected(connected);
+          setWaStatus(status);
+          if (!connected) startWaPolling();
+        })
+        .catch(() => {});
+    } else {
+      stopWaPolling();
+    }
+    return () => stopWaPolling();
+  }, [activeTab, id]);
+
+  const handleWaConnect = async () => {
+    try {
+      setWaLoading(true);
+      setQrDataUrl(null);
+      await whatsappService.connect(id);
+      setWaStatus("initializing");
+      toast.success("Iniciando conexão WhatsApp...");
+      startWaPolling();
+    } catch (err) {
+      toast.error("Erro ao iniciar conexão");
+    } finally {
+      setWaLoading(false);
+    }
+  };
+
+  const handleWaDisconnect = async () => {
+    try {
+      setWaLoading(true);
+      await whatsappService.disconnect(id);
+      setWaConnected(false);
+      setWaStatus("disconnected");
+      setQrDataUrl(null);
+      stopWaPolling();
+      toast.success("WhatsApp desconectado");
+    } catch (err) {
+      toast.error("Erro ao desconectar");
+    } finally {
+      setWaLoading(false);
     }
   };
 
@@ -71,7 +161,10 @@ export default function BotConfig() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/bots')} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        <button
+          onClick={() => navigate("/bots")}
+          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        >
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-2xl font-bold text-gray-900">{form.name}</h1>
@@ -80,14 +173,15 @@ export default function BotConfig() {
       <div className="card">
         <div className="flex border-b border-gray-100">
           {[
-            { id: 'settings', label: 'Configurações', icon: Settings },
-            { id: 'install', label: 'Instalar Widget', icon: Code },
-            { id: 'preview', label: 'Pré-visualizar', icon: Eye },
+            { id: "settings", label: "Configurações", icon: Settings },
+            { id: "install", label: "Instalar Widget", icon: Code },
+            { id: "preview", label: "Pré-visualizar", icon: Eye },
+            { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
           ].map(({ id: tabId, label, icon: Icon }) => (
             <button
               key={tabId}
               onClick={() => setActiveTab(tabId)}
-              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === tabId ? 'border-brand-500 text-brand-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+              className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${activeTab === tabId ? "border-brand-500 text-brand-600" : "border-transparent text-gray-600 hover:text-gray-900"}`}
             >
               <Icon size={16} />
               {label}
@@ -96,7 +190,7 @@ export default function BotConfig() {
         </div>
 
         <div className="p-6">
-          {activeTab === 'settings' && (
+          {activeTab === "settings" && (
             <form onSubmit={handleUpdate} className="space-y-6 max-w-2xl">
               <div>
                 <label className="label">Nome do bot</label>
@@ -126,7 +220,9 @@ export default function BotConfig() {
                 <label className="label">Prompt do sistema</label>
                 <textarea
                   value={form.systemPrompt}
-                  onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, systemPrompt: e.target.value })
+                  }
                   placeholder="Descreva como o bot deve se comportar..."
                   rows="5"
                   className="input resize-none"
@@ -137,7 +233,9 @@ export default function BotConfig() {
                 <label className="label">Mensagem de boas-vindas</label>
                 <textarea
                   value={form.welcomeMessage}
-                  onChange={(e) => setForm({ ...form, welcomeMessage: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, welcomeMessage: e.target.value })
+                  }
                   placeholder="Mensagem exibida ao iniciar a conversa"
                   rows="3"
                   className="input resize-none"
@@ -149,27 +247,34 @@ export default function BotConfig() {
                 disabled={submitting}
                 className="btn-primary"
               >
-                {submitting ? <Loader size={16} className="animate-spin" /> : <>
-                  <Save size={16} />
-                  Salvar alterações
-                </>}
+                {submitting ? (
+                  <Loader size={16} className="animate-spin" />
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Salvar alterações
+                  </>
+                )}
               </button>
             </form>
           )}
 
-          {activeTab === 'install' && (
+          {activeTab === "install" && (
             <div className="space-y-6 max-w-2xl">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Código de instalação</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">
+                  Código de instalação
+                </h3>
                 <p className="text-sm text-gray-600 mb-3">
-                  Copie o código abaixo e cole antes da tag de fechamento &lt;/body&gt; no seu website.
+                  Copie o código abaixo e cole antes da tag de fechamento
+                  &lt;/body&gt; no seu website.
                 </p>
                 <div className="relative bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto">
                   <code>{embedCode}</code>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(embedCode);
-                      toast.success('Código copiado!');
+                      toast.success("Código copiado!");
                     }}
                     className="absolute top-3 right-3 px-3 py-1 bg-brand-500 text-white text-xs rounded hover:bg-brand-600"
                   >
@@ -190,19 +295,154 @@ export default function BotConfig() {
             </div>
           )}
 
-          {activeTab === 'preview' && (
+          {activeTab === "preview" && (
             <div className="space-y-6 max-w-2xl">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3">Pré-visualização do widget</h3>
+                <h3 className="font-semibold text-gray-900 mb-3">
+                  Pré-visualização do widget
+                </h3>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-500">
-                  <p className="text-sm">A pré-visualização será exibida aqui quando integrado ao seu site</p>
+                  <p className="text-sm">
+                    A pré-visualização será exibida aqui quando integrado ao seu
+                    site
+                  </p>
                 </div>
               </div>
 
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <p className="text-sm text-yellow-800">
-                  O widget aparecerá como um botão flutuante no canto inferior direito da sua página.
+                  O widget aparecerá como um botão flutuante no canto inferior
+                  direito da sua página.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "whatsapp" && (
+            <div className="space-y-6 max-w-md">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">
+                  Conexão WhatsApp
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Conecte seu número de WhatsApp para que este bot responda
+                  automaticamente.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {waConnected ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-100 text-green-700 text-sm font-medium">
+                    <Wifi size={14} /> Conectado
+                  </span>
+                ) : waStatus === "initializing" ||
+                  waStatus === "loading" ||
+                  waStatus === "authenticated" ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm font-medium">
+                    <Loader size={14} className="animate-spin" /> Conectando...
+                  </span>
+                ) : waStatus === "qr_pending" ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-sm font-medium">
+                    <RefreshCw size={14} className="animate-spin" /> Aguardando
+                    leitura do QR
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-sm font-medium">
+                    <WifiOff size={14} /> Desconectado
+                  </span>
+                )}
+              </div>
+
+              {!waConnected && qrDataUrl && (
+                <div className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-gray-200 rounded-xl">
+                  <p className="text-sm text-gray-600 font-medium">
+                    Escaneie o QR code com o WhatsApp
+                  </p>
+                  <img
+                    src={qrDataUrl}
+                    alt="QR Code WhatsApp"
+                    className="w-56 h-56 rounded-lg"
+                  />
+                  <p className="text-xs text-gray-400">
+                    O QR code expira em 20s — um novo será gerado
+                    automaticamente
+                  </p>
+                </div>
+              )}
+
+              {!waConnected &&
+                !qrDataUrl &&
+                (waStatus === "initializing" ||
+                  waStatus === "loading" ||
+                  waStatus === "authenticated") && (
+                  <div className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-yellow-200 rounded-xl text-center">
+                    <Loader
+                      size={32}
+                      className="animate-spin text-yellow-500"
+                    />
+                    <p className="text-sm text-gray-600">
+                      Inicializando... o QR code aparecerá em instantes.
+                    </p>
+                  </div>
+                )}
+
+              {waConnected && (
+                <div className="flex flex-col items-center gap-3 p-6 bg-green-50 border border-green-200 rounded-xl text-center">
+                  <Wifi size={40} className="text-green-500" />
+                  <p className="text-sm text-green-700 font-medium">
+                    WhatsApp conectado com sucesso!
+                  </p>
+                  <p className="text-xs text-green-600">
+                    O bot está respondendo mensagens automaticamente.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                {!waConnected ? (
+                  <button
+                    onClick={handleWaConnect}
+                    disabled={
+                      waLoading ||
+                      waStatus === "initializing" ||
+                      waStatus === "loading" ||
+                      waStatus === "qr_pending"
+                    }
+                    className="btn-primary"
+                  >
+                    {waLoading ? (
+                      <Loader size={16} className="animate-spin" />
+                    ) : (
+                      <MessageCircle size={16} />
+                    )}
+                    {waStatus === "qr_pending"
+                      ? "Aguardando scan..."
+                      : "Conectar WhatsApp"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleWaDisconnect}
+                    disabled={waLoading}
+                    className="px-4 py-2 border border-red-300 text-red-600 rounded-lg font-medium text-sm hover:bg-red-50 transition-colors flex items-center gap-2"
+                  >
+                    {waLoading ? (
+                      <Loader size={16} className="animate-spin" />
+                    ) : (
+                      <WifiOff size={16} />
+                    )}
+                    Desconectar
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                <strong>Como conectar:</strong>
+                <ol className="mt-1 space-y-1 list-decimal list-inside">
+                  <li>Clique em "Conectar WhatsApp"</li>
+                  <li>Abra o WhatsApp no celular</li>
+                  <li>Vá em Dispositivos vinculados → Vincular dispositivo</li>
+                  <li>Escaneie o QR code que aparecerá aqui</li>
+                </ol>
               </div>
             </div>
           )}

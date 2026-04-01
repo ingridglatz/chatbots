@@ -53,4 +53,25 @@ export const chatService = {
   getHistory: (sessionId, botId) => api.get(`/chat/history/${sessionId}`, { params: { botId } }),
 };
 
+export const whatsappService = {
+  connect: (botId) => api.post(`/tenant/bots/${botId}/whatsapp/connect`),
+  getQR: (botId) => api.get(`/tenant/bots/${botId}/whatsapp/qr`),
+  getStatus: (botId) => api.get(`/tenant/bots/${botId}/whatsapp/status`),
+  disconnect: (botId) => api.post(`/tenant/bots/${botId}/whatsapp/disconnect`),
+};
+
+export const aiSettingsService = {
+  get: () => api.get('/tenant/settings/ai'),
+  save: (data) => api.post('/tenant/settings/ai', data),
+  removeKey: () => api.delete('/tenant/settings/ai/key'),
+};
+
+export const conversationService = {
+  list: (botId) => api.get(`/tenant/bots/${botId}/conversations`),
+  getMessages: (conversationId) => api.get(`/tenant/conversations/${conversationId}/messages`),
+  takeOver: (conversationId) => api.post(`/tenant/conversations/${conversationId}/takeover`),
+  release: (conversationId) => api.post(`/tenant/conversations/${conversationId}/release`),
+  sendMessage: (conversationId, message) => api.post(`/tenant/conversations/${conversationId}/send`, { message }),
+};
+
 export default api;

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Bot, Users, CreditCard, LogOut, Zap } from 'lucide-react';
+import { LayoutDashboard, Bot, Users, CreditCard, LogOut, Zap, Settings } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import clsx from 'clsx';
 
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/bots', icon: Bot, label: 'Meus Bots' },
   { to: '/clientes', icon: Users, label: 'Clientes' },
   { to: '/planos', icon: CreditCard, label: 'Planos' },
+  { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
 
 const PLAN_COLORS = {

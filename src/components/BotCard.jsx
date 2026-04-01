@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Settings, Trash2, ToggleLeft, ToggleRight, Bot, Copy, CheckCheck } from 'lucide-react';
+import { Settings, Trash2, ToggleLeft, ToggleRight, Bot, Copy, CheckCheck, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -46,6 +46,7 @@ export default function BotCard({ bot, onDelete, onToggle }) {
       </div>
       <div className="flex gap-2 pt-1">
         <button onClick={() => navigate(`/bots/${bot.id}`)} className="btn-secondary flex-1 text-xs py-1.5"><Settings size={14} />Configurar</button>
+        <button onClick={() => navigate(`/bots/${bot.id}/conversations`)} className="btn-secondary flex-1 text-xs py-1.5"><MessageSquare size={14} />Conversas</button>
         <button onClick={() => onDelete(bot.id)} className="btn-danger text-xs py-1.5 px-3" title="Excluir bot"><Trash2 size={14} /></button>
       </div>
     </div>
