@@ -9,8 +9,9 @@ import {
   CheckCircle,
   AlertCircle,
   Cpu,
+  Phone,
 } from "lucide-react";
-import { aiSettingsService } from "../services/api";
+import { aiSettingsService, operatorService } from "../services/api";
 import toast from "react-hot-toast";
 
 const MODELS = [
@@ -44,6 +45,8 @@ export default function Configuracoes() {
     apiKeyMasked: null,
   });
   const [apiKey, setApiKey] = useState("");
+  const [operatorPhone, setOperatorPhone] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
 
   useEffect(() => {
     aiSettingsService
@@ -81,6 +84,25 @@ export default function Configuracoes() {
       toast.error(err.response?.data?.message || "Erro ao salvar");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSavePhone = async (e) => {
+    e.preventDefault();
+    const digits = operatorPhone.replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 15) {
+      toast.error("Número inválido. Use o formato com DDD, ex: 11999998888");
+      return;
+    }
+    try {
+      setSavingPhone(true);
+      await operatorService.savePhone(digits);
+      toast.success("Número do operador salvo!");
+      setOperatorPhone("");
+    } catch {
+      toast.error("Erro ao salvar número");
+    } finally {
+      setSavingPhone(false);
     }
   };
 
@@ -286,6 +308,52 @@ export default function Configuracoes() {
             <Save size={16} />
           )}
           Salvar configurações
+        </button>
+      </form>
+
+      <form onSubmit={handleSavePhone} className="card p-6 space-y-5">
+        <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
+          <div className="w-9 h-9 bg-green-50 rounded-lg flex items-center justify-center">
+            <Phone size={18} className="text-green-600" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-gray-900">
+              WhatsApp do Operador
+            </h2>
+            <p className="text-sm text-gray-500">
+              Quando um cliente pedir atendimento humano, este número receberá
+              uma notificação no WhatsApp
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Número com DDD (somente dígitos)</label>
+          <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+              <Phone size={16} className="text-gray-400" />
+            </div>
+            <input
+              type="tel"
+              value={operatorPhone}
+              onChange={(e) => setOperatorPhone(e.target.value)}
+              placeholder="Ex: 11999998888"
+              className="input pl-9"
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            O número deve estar conectado ao WhatsApp do bot para receber
+            mensagens.
+          </p>
+        </div>
+
+        <button type="submit" disabled={savingPhone} className="btn-primary">
+          {savingPhone ? (
+            <Loader size={16} className="animate-spin" />
+          ) : (
+            <Save size={16} />
+          )}
+          Salvar número
         </button>
       </form>
     </div>

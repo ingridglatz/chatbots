@@ -74,4 +74,8 @@ export const conversationService = {
   sendMessage: (conversationId, message) => api.post(`/tenant/conversations/${conversationId}/send`, { message }),
 };
 
+export const operatorService = {
+  savePhone: (phone) => api.post('/tenant/settings/operator-phone', { phone }),
+};
+
 export default api;
