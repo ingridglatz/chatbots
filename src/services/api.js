@@ -11,12 +11,53 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+let refreshing = null;
+
+const tryRefreshToken = async () => {
+  if (refreshing) return refreshing;
+  const oldToken = localStorage.getItem('cb_token');
+  if (!oldToken) return null;
+  refreshing = axios
+    .post(`${BASE_URL}/tenant/refresh-token`, { token: oldToken }, { timeout: 10000 })
+    .then((res) => {
+      const newToken = res.data?.data?.token;
+      if (newToken) localStorage.setItem('cb_token', newToken);
+      return newToken || null;
+    })
+    .catch(() => null)
+    .finally(() => { refreshing = null; });
+  return refreshing;
+};
+
+const redirectToLogin = () => {
+  localStorage.removeItem('cb_token');
+  if (window.location.pathname !== '/login') window.location.href = '/login';
+};
+
 api.interceptors.response.use(
   (res) => res,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
     const message = error.response?.data?.message;
-    if (status === 401) { localStorage.removeItem('cb_token'); window.location.href = '/login'; return Promise.reject(error); }
+    const original = error.config;
+    const code = error.response?.data?.code;
+
+    if (status === 401 && !original?._retried) {
+      original._retried = true;
+      // Não tentar refresh em endpoints de auth
+      const isAuthRoute = original.url?.includes('/tenant/login')
+        || original.url?.includes('/tenant/register')
+        || original.url?.includes('/tenant/refresh-token');
+      if (!isAuthRoute && code !== 'INVALID_CREDENTIALS') {
+        const newToken = await tryRefreshToken();
+        if (newToken) {
+          original.headers.Authorization = `Bearer ${newToken}`;
+          return api(original);
+        }
+      }
+      redirectToLogin();
+      return Promise.reject(error);
+    }
     if (status === 402) toast.error(message || 'Limite do plano atingido.', { icon: '🔒' });
     else if (status === 429) toast.error('Muitas requisições. Aguarde um momento.');
     else if (status >= 500) toast.error('Erro interno. Tente novamente.');
@@ -76,6 +117,12 @@ export const conversationService = {
 
 export const operatorService = {
   savePhone: (phone) => api.post('/tenant/settings/operator-phone', { phone }),
+};
+
+export const userService = {
+  list: () => api.get('/tenant/users'),
+  invite: (data) => api.post('/tenant/users/invite', data),
+  remove: (userId) => api.delete(`/tenant/users/${userId}`),
 };
 
 export default api;
