@@ -15,7 +15,8 @@ export default function BotCard({ bot, onDelete, onToggle }) {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const tone = TONE_LABELS[bot.tone] || TONE_LABELS.friendly;
-  const embedCode = `<script src="${window.location.origin}/widget.js" data-bot-id="${bot.id}"></script>`;
+  const apiUrl = import.meta.env.VITE_PUBLIC_API_URL || `${window.location.origin}/api`;
+  const embedCode = `<script src="${window.location.origin}/widget.js" data-bot-id="${bot.id}" data-api-url="${apiUrl}"></script>`;
   const copyEmbed = async () => {
     await navigator.clipboard.writeText(embedCode);
     setCopied(true);

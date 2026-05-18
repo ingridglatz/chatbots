@@ -12,6 +12,7 @@ import {
   Phone,
 } from "lucide-react";
 import { aiSettingsService, operatorService } from "../services/api";
+import Modal from "../components/Modal";
 import toast from "react-hot-toast";
 
 const MODELS = [
@@ -47,6 +48,7 @@ export default function Configuracoes() {
   const [apiKey, setApiKey] = useState("");
   const [operatorPhone, setOperatorPhone] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
+  const [removeKeyModalOpen, setRemoveKeyModalOpen] = useState(false);
 
   useEffect(() => {
     aiSettingsService
@@ -76,7 +78,7 @@ export default function Configuracoes() {
         setSettings((prev) => ({
           ...prev,
           hasCustomKey: true,
-          apiKeyMasked: apiKey.slice(0, 12) + "••••••••" + apiKey.slice(-4),
+          apiKeyMasked: "••••••••" + apiKey.slice(-4),
         }));
         setApiKey("");
       }
@@ -107,10 +109,6 @@ export default function Configuracoes() {
   };
 
   const handleRemoveKey = async () => {
-    if (
-      !confirm("Remover sua chave? A plataforma voltará a usar a chave padrão.")
-    )
-      return;
     try {
       setRemoving(true);
       await aiSettingsService.removeKey();
@@ -120,6 +118,7 @@ export default function Configuracoes() {
         hasCustomKey: false,
         apiKeyMasked: null,
       }));
+      setRemoveKeyModalOpen(false);
       toast.success("Chave removida");
     } catch {
       toast.error("Erro ao remover chave");
@@ -218,7 +217,7 @@ export default function Configuracoes() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleRemoveKey}
+                  onClick={() => setRemoveKeyModalOpen(true)}
                   disabled={removing}
                   className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
                 >
@@ -356,6 +355,39 @@ export default function Configuracoes() {
           Salvar número
         </button>
       </form>
+
+      <Modal
+        open={removeKeyModalOpen}
+        onClose={() => setRemoveKeyModalOpen(false)}
+        title="Remover chave de API"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Tem certeza? A plataforma voltará a usar a chave padrão e seu uso de
+            IA passará a ser contabilizado no seu plano.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setRemoveKeyModalOpen(false)}
+              className="btn-secondary flex-1"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleRemoveKey}
+              disabled={removing}
+              className="btn-danger flex-1"
+            >
+              {removing ? (
+                <Loader size={16} className="animate-spin" />
+              ) : (
+                "Remover chave"
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

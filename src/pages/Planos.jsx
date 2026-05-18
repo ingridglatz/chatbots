@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Check, Loader, Download } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { billingService } from '../services/api';
+import Modal from '../components/Modal';
 import toast from 'react-hot-toast';
 
 export default function Planos() {
@@ -11,6 +12,7 @@ export default function Planos() {
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(false);
   const [canceling, setCanceling] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,11 +45,11 @@ export default function Planos() {
   };
 
   const handleCancel = async () => {
-    if (!window.confirm('Tem certeza que deseja cancelar? Você perderá acesso após o período vigente.')) return;
     try {
       setCanceling(true);
       await billingService.cancel();
       toast.success('Assinatura cancelada');
+      setCancelModalOpen(false);
     } catch (err) {
       toast.error('Erro ao cancelar assinatura');
     } finally {
@@ -99,7 +101,7 @@ export default function Planos() {
 
             {tenant?.plan === plan.id ? (
               <button
-                onClick={handleCancel}
+                onClick={() => setCancelModalOpen(true)}
                 disabled={canceling}
                 className="btn-danger w-full"
               >
@@ -126,7 +128,7 @@ export default function Planos() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-900">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-900">Data</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-900">Vencimento</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-900">Valor</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-900">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-900">Ação</th>
@@ -137,26 +139,30 @@ export default function Planos() {
                   <tr key={invoice.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-mono text-gray-600">{invoice.id.slice(0, 12)}...</td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {new Date(invoice.date).toLocaleDateString('pt-BR')}
+                      {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('pt-BR') : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                      R$ {invoice.amount.toFixed(2)}
+                      {(invoice.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <span className={`badge capitalize ${invoice.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {invoice.status === 'paid' ? 'Pago' : 'Pendente'}
+                      <span className={`badge capitalize ${invoice.status === 'CONFIRMED' || invoice.status === 'RECEIVED' ? 'bg-green-100 text-green-700' : invoice.status === 'OVERDUE' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {invoice.status === 'CONFIRMED' || invoice.status === 'RECEIVED' ? 'Pago' : invoice.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <a
-                        href={invoice.pdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-brand-600 hover:text-brand-700 flex items-center gap-1"
-                      >
-                        <Download size={14} />
-                        Download
-                      </a>
+                      {invoice.pdfUrl ? (
+                        <a
+                          href={invoice.pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-brand-600 hover:text-brand-700 flex items-center gap-1"
+                        >
+                          <Download size={14} />
+                          Boleto/PIX
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -165,6 +171,40 @@ export default function Planos() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        title="Cancelar assinatura"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Tem certeza que deseja cancelar? Você manterá acesso até o fim do
+            ciclo atual e perderá acesso aos recursos do plano após o
+            vencimento.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setCancelModalOpen(false)}
+              className="btn-secondary flex-1"
+            >
+              Manter
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={canceling}
+              className="btn-danger flex-1"
+            >
+              {canceling ? (
+                <Loader size={16} className="animate-spin" />
+              ) : (
+                'Cancelar agora'
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -24,9 +24,14 @@ const playNotificationSound = () => {
   } catch {}
 };
 
+const BASE_INTERVAL = 15000;
+const MAX_INTERVAL = 120000;
+
 export const useNotifications = () => {
   const [waitingCount, setWaitingCount] = useState(0);
   const prevCount = useRef(0);
+  const failures = useRef(0);
+  const timerRef = useRef(null);
 
   const fetchCount = useCallback(async () => {
     try {
@@ -34,7 +39,7 @@ export const useNotifications = () => {
       const count = res.data.data.count || 0;
       if (count > prevCount.current) {
         playNotificationSound();
-        if (Notification.permission === "granted") {
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
           new Notification("💬 Novo atendimento", {
             body: `${count} conversa${count > 1 ? "s" : ""} aguardando atendimento`,
             icon: "/favicon.ico",
@@ -43,17 +48,37 @@ export const useNotifications = () => {
       }
       prevCount.current = count;
       setWaitingCount(count);
-    } catch {}
+      failures.current = 0;
+    } catch {
+      failures.current = Math.min(failures.current + 1, 4);
+    }
   }, []);
 
   useEffect(() => {
-    if (Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
-    }
-    fetchCount();
-    const interval = setInterval(fetchCount, 15000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      await fetchCount();
+      if (cancelled) return;
+      const delay = Math.min(BASE_INTERVAL * 2 ** failures.current, MAX_INTERVAL);
+      timerRef.current = setTimeout(tick, delay);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [fetchCount]);
 
-  return { waitingCount };
+  const requestPermission = useCallback(async () => {
+    if (typeof Notification === "undefined") return "unsupported";
+    if (Notification.permission === "granted") return "granted";
+    try {
+      return await Notification.requestPermission();
+    } catch {
+      return "denied";
+    }
+  }, []);
+
+  return { waitingCount, requestPermission };
 };

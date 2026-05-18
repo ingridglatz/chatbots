@@ -156,7 +156,8 @@ export default function BotConfig() {
     );
   }
 
-  const embedCode = `<script src="${window.location.origin}/widget.js" data-bot-id="${id}"></script>`;
+  const apiUrl = import.meta.env.VITE_PUBLIC_API_URL || `${window.location.origin}/api`;
+  const embedCode = `<script src="${window.location.origin}/widget.js" data-bot-id="${id}" data-api-url="${apiUrl}"></script>`;
 
   return (
     <div className="space-y-6">
